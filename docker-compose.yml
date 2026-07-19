@@ -1,0 +1,26 @@
+# Local development only. This is not how the architecture's dev/staging/
+# prod environments are provisioned — those are Terraform + Kubernetes,
+# starting at Milestone 7. Compose exists purely so a developer (or this
+# milestone's own verification step) can build and run pulse-api with one
+# command and no cluster at all.
+services:
+  pulse-api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: "info"
+      MAX_PULSES: "100"
+    # Proves the image actually runs under the same constraints Kubernetes
+    # will enforce later, rather than discovering a problem with that for
+    # the first time in Milestone 11.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

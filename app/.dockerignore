@@ -1,0 +1,13 @@
+# Keeps the build context small and keeps test code, VCS metadata, and any
+# local-only files out of the image builder stage entirely.
+tests/
+**/*_test.go
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.env
+.env.*
+*.md
+.vscode/
+.idea/
