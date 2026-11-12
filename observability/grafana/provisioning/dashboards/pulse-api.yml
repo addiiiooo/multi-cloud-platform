@@ -1,0 +1,13 @@
+# Loads every dashboard JSON in /etc/grafana/dashboards (mounted read-only
+# from observability/grafana/dashboards). The JSON in git is the source of
+# truth: UI edits are refused so a dashboard can't drift away from the repo.
+apiVersion: 1
+
+providers:
+  - name: pulse-api
+    folder: pulse-api
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

@@ -1,0 +1,17 @@
+# Provisioned on Grafana startup so the dashboard works with zero clicks.
+# The fixed uid is what observability/grafana/dashboards/pulse-api.json
+# references, so the two files must change together.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      # Matches scrape_interval in prometheus.yml so $__rate_interval
+      # never picks a window shorter than 4 scrapes.
+      timeInterval: 5s

@@ -1,0 +1,32 @@
+# Alert rules for pulse-api. Verified by alerts_test.yml:
+#   docker run --rm -v "$PWD/observability/prometheus:/rules:ro" -w /rules \
+#     --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts_test.yml
+groups:
+  - name: pulse-api
+    rules:
+      # Prometheus itself sets up=0 when a scrape fails, so this catches a
+      # crashed container, a hung process and a broken network path alike.
+      - alert: PulseApiDown
+        expr: up{job="pulse-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: pulse-api is not answering Prometheus scrapes
+          description: The pulse-api scrape target has been down for more than 1 minute.
+
+      # Error ratio over API routes only. /metrics, /healthz and /readyz are
+      # excluded on purpose: scrapes and probes arrive every few seconds and
+      # would dilute the ratio, hiding real user-facing errors.
+      - alert: PulseApiHigh5xxRatio
+        expr: |
+          sum(rate(pulse_http_requests_total{job="pulse-api", path=~"/api/.*", status=~"5.."}[5m]))
+            /
+          sum(rate(pulse_http_requests_total{job="pulse-api", path=~"/api/.*"}[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: pulse-api is returning 5xx on more than 5% of API requests
+          description: The 5xx share of /api/* responses has stayed above 5% for 5 minutes.

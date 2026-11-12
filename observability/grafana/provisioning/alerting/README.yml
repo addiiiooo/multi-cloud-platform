@@ -1,0 +1,4 @@
+# Intentionally empty: pulse-api's alert rules live in Prometheus
+# (observability/prometheus/alerts.yml), not in Grafana. This file exists
+# so Grafana finds a valid alerting provisioning directory on startup.
+apiVersion: 1

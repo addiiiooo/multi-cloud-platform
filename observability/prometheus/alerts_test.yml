@@ -1,0 +1,67 @@
+# Unit tests for alerts.yml, run with `promtool test rules alerts_test.yml`
+# (see the command at the top of alerts.yml).
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Target answers for 2 minutes, then stops. With `for: 1m` the alert must
+  # stay quiet while it is pending and fire once the minute has passed.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="pulse-api", instance="pulse-api:8080"}'
+        values: "1 1 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PulseApiDown
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: PulseApiDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: PulseApiDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: pulse-api
+              instance: pulse-api:8080
+            exp_annotations:
+              summary: pulse-api is not answering Prometheus scrapes
+              description: The pulse-api scrape target has been down for more than 1 minute.
+
+  # 60 successful API requests/min throughout; from minute 6, 10 errors/min
+  # (about 14% of API traffic). Health-probe 503s are added too, to prove
+  # they do not count toward the ratio.
+  - interval: 1m
+    input_series:
+      - series: 'pulse_http_requests_total{job="pulse-api", method="GET", path="/api/v1/pulses", status="200"}'
+        values: "0+60x20"
+      - series: 'pulse_http_requests_total{job="pulse-api", method="POST", path="/api/v1/pulses", status="500"}'
+        values: "0x5 10+10x14"
+      - series: 'pulse_http_requests_total{job="pulse-api", method="GET", path="/readyz", status="503"}'
+        values: "0+1000x20"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: PulseApiHigh5xxRatio
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: PulseApiHigh5xxRatio
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: pulse-api is returning 5xx on more than 5% of API requests
+              description: The 5xx share of /api/* responses has stayed above 5% for 5 minutes.
+
+  # Only probe failures, no API errors: the 5xx ratio alert must stay silent.
+  - interval: 1m
+    input_series:
+      - series: 'pulse_http_requests_total{job="pulse-api", method="GET", path="/api/v1/pulses", status="200"}'
+        values: "0+60x20"
+      - series: 'pulse_http_requests_total{job="pulse-api", method="GET", path="/readyz", status="503"}'
+        values: "0+1000x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: PulseApiHigh5xxRatio
+        exp_alerts: []

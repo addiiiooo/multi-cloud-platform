@@ -3,6 +3,13 @@
 # starting at Milestone 7. Compose exists purely so a developer (or this
 # milestone's own verification step) can build and run pulse-api with one
 # command and no cluster at all.
+#
+#   docker compose up --build                          # pulse-api only
+#   docker compose --profile observability up --build  # + Prometheus + Grafana
+#
+# The observability services sit behind a profile so the plain
+# `docker compose up` above behaves exactly as it did before they existed.
+# See observability/README.md.
 services:
   pulse-api:
     build:
@@ -24,3 +31,56 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  prometheus:
+    profiles: ["observability"]
+    # Pinned, like every other image in this repo, so a local run today and
+    # one next month scrape and evaluate rules the same way.
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    # Bound to loopback: the Prometheus UI and API have no authentication.
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - pulse-api
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:12.1.0
+    environment:
+      # Anyone who can reach the loopback port can view (never edit) the
+      # dashboard without logging in. The admin account keeps Grafana's
+      # default credentials and forces a password change on first login.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/pulse-api.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  prometheus-data:
+  grafana-data:

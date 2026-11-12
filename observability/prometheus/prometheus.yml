@@ -1,0 +1,20 @@
+# Local-dev Prometheus for pulse-api (started by the "observability"
+# Compose profile, see observability/README.md). In staging/prod the
+# architecture scrapes /metrics with an OpenTelemetry Collector and exports
+# to CloudWatch / Cloud Monitoring instead; this file only exists so the
+# metrics and the Grafana dashboard can be exercised with no cloud at all.
+global:
+  # 5s rather than the usual 15s: on a laptop the point is to see a panel
+  # react within seconds of sending traffic, and one target makes the
+  # extra scrape load irrelevant.
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: pulse-api
+    static_configs:
+      # Compose service DNS name; pulse-api listens on 8080 inside the network.
+      - targets: ["pulse-api:8080"]
